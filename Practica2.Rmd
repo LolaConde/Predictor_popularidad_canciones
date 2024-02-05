@@ -1,0 +1,352 @@
+---
+title: "Práctica 2"
+author: Apredizaje Computacional, Grado en Ingeniería Informática, 2023/2024. Universidad de Murcia. Lola Conde Herrera y Ángel Abellán Pérez
+date: "`r Sys.Date()`"
+output:
+  
+  html_document:
+    df_print: paged
+    highlight: kate
+    number_sections: yes
+    theme: spacelab
+    toc: yes
+    toc_float: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introducción
+
+Esta es la segunda práctica y final de la asignatura de Aprendizaje Computacional de 1er cuatrimestre de cuarto curso del Grado en Informática de la Universidad de Murcia para el curso 2023/2024.
+
+# El problema
+
+Tenemos un dataset con una entrada para una canción que indica, sobre todo, su nivel de popularidad a diario. El dataset se actualiza diariamente, e incluye, en cada actualización, las 50 canciones de spotify más populares, analizadas en un contexto de 70 paises. El dataset, accesible [aquí](https://aulavirtual.um.es/access/content/group/3891_G_2023_N_N/Laboratorios/spoti.csv.zip), incluye, de esta forma, un total de 3168 canciones, en 105669 entradas diferentes y descritas mediante 25 atributos. El conjunto de atributos es el siguiente
+
+* spotify_id: el identificador de la canción.
+
+* name: el título de la canción.
+
+* artists: el nombre del artista o artistas detrás de la canción.
+
+* daily_rank: el ranking de la canción en el día correspondiente, dentro del top 50.
+
+* daily_movement: el cambio de posición en el ranking, comparado con el día previo.
+
+* weekly_movement: el cambio de posición en el ranking comparado con la semana anterior.
+
+* country: un código correspondiente al país del que se originó la entrada de la canción en el top 50.
+
+* snapshot_date: fecha en la que se recogió el dato correspondiente a la entrada en la tabla.
+
+* is_explicit: si la canción contiene lenguaje explícito o no.
+
+* duration_ms: duración de la canción en milisegundos.
+
+* album_name, album_release: nombre del album, fecha de publicación.
+
+* danceability, energy, key, loudness, mode, speechiness, acousticness, instrumentalness: parámetros sobre el propio sonido de la canción que indican si es bailable, el nivel de energía, la clave en la que está interpretada, el volumen a la que fue grabada en dbs, si la canción está en clave mayor o menor, el nivel de presencia de palabra hablada en la canción, la calidad acústica de la canción, y su predominio de la instrumentación con respecto a lo vocal, respectivamente.
+
+* liveness: si se grabó en directo.
+
+* valence: medida del positivismo transmitido por la canción.
+
+* tempo: el número de beats por minuto de la canción.
+
+* time_signature: nivel en una escala de ritmo musical.
+
+* popularity: medida del nivel de popularidad de la canción, correspondiente a la fecha en la que se generó el registro de entrada.
+
+# Apartado A: Descripción del conjunto de datos (1.5 puntos)
+
+## Enunciado
+
+Describe brevemente el conjunto de entrenamiento.
+
+Describe además, los atributos predictores del conjunto y la variable a predecir. Divide la descripción de los atributos en cuatro grupos, a saber: 
+(1) predictores numéricos que, a priori, no tienen relación alguna con `popularity` y por tanto no son útiles para su predicción. (2) Predictores numéricos que pueden aportar algo a la predicción de `popularity` y predictores categóricos (3) relacionados con `popularity` y (4) no relacionados. 
+Justifica el porqué entiendes que cada atributo tiene o no relación con `popularity`.
+
+## Lectura del dataset
+
+En primer lugar, se va a almacenar el dataset en la variable *datos*:
+
+```{r}
+rutaDeDatos <- "C:/Users/lolac/OneDrive/Documentos/Lola/Carrera/Cuarto/AC/Entrega 2/spoti.csv"
+datos <- read.csv(rutaDeDatos, na.strings = "")
+```
+
+Una vez almacenado el dataset que se encontraba en la ruta *rutaDeDatos* en *datos*, se va a proceder describiendo este conjunto de entrenamiento.
+
+## Descripción breve del conjunto de entrenamiento
+
+Se presenta la estructura del dataset:
+
+```{r}
+str(datos)
+```
+
+Se puede observar que existen 105669 entradas diferentes, con 24 predictores y la variable a predecir `popularity`. A continuación, vamos a comprobar si en nuestros datos hay NAs.
+
+```{r}
+apply(datos, 2, function(y){sum(is.na(y))})
+```
+
+Se puede observar NAs en los predictores name, artists, country, album_name, y album_release_date. El tratamiento de los NAs se realizará posteriomente cuando se haya analizado cada predictor, debido a que es importante conocer qué predictores usaremos para decidir la estrategia a seguir con los NAs.
+
+Antes de proseguir con los predictores, se va a comprobar el número de entradas únicas que hay en cada predictor.
+
+```{r}
+apply(datos, 2, function(y){length(unique(y))})
+```
+
+Se puede observar un total de 29 días distintos en snapchot_date, se va a comprobar entre qué fechas están los días:
+
+```{r}
+min(unique(datos$snapshot_date))
+max(unique(datos$snapshot_date))
+```
+Estos días corresponden a días consecutivos desde mitad de octubre hasta mitad de noviembre.
+
+En spotify_id, hay 3168 valores distintos. Teniendo en cuenta que tenemos 105669 muestras y que el spotify_id se refiere a una canción en concreto, las canciones se repiten mucho en los top 50 de los diferentes paises durante los 29 días. Esto se corresponde con lo visto con anterioridad, ya que es más probable que las canciones sean populares durante un tiempo, a que lo sean un solo día; y al tener 29 días, es más probable que las canciones se repitan en el top 50.
+
+Hay un total de 72 paises diferentes (existen NAs).
+
+`Popularity` es la variable a predecir, y tiene 101 valores diferentes, que van desde 0 hasta 100 inclusive, como se puede observar a continuación.
+
+```{r}
+min(unique(datos$popularity))
+max(unique(datos$popularity))
+```
+
+## Predictores numéricos que, a priori, no tienen relación alguna con `popularity`
+
+No se ha encontrado ninguno.
+
+## Predictores numéricos que pueden aportar algo a la predicción de `popularity`
+
+### daily_movement y weekly_movement
+
+*daily_movement* indica el cambio de posición en el ranking de la canción con respecto al día anterior. A su vez, *weekly_movement* indica el cambio de posición en el ranking respecto a la semana anterior. Ambos predictores dependen de cómo de escuchada es la canción en esa semana/dia. Por ello, está relacionado con la popularidad de la canción; si una canción se escucha más, entonces será cada vez más popular, y su daily_movement y weekly_movement subirá.
+
+### liveness
+
+Dado que *liveness* indica el porcentaje de la canción que se grabó en directo, esto podría influir en la popularidad, ya que las personas suelen tener preferencias sobre cómo las canciones están grabadas.
+
+### loudness
+
+Dado que *loudness* indica el volumen a la que fue grabada la canción en dbs, esto podría influir en la popularidad de la canción.
+
+### energy
+
+Dado que *energy* indica el nivel de energía de la canción, la energía que tenga la canción podría hacer que gustase más o menos a las personas, y por lo tanto influir en su popularidad.
+
+### daily_rank
+
+Dado que *daily_rank* indica el puesto dentro del top 50 de un pais concreto, esto indica la popularidad de esa canción en ese país el día en el que está en el top. Por esta misma razón, *daily_rank* parece un buen indicador de `popularity`.
+
+### valence
+
+Dado que *valance* indica el positivismo transmitido por la canción, se cree que es un buen indicador de `popularity`, ya que una canción que transmita positivismo es más probable que guste a la gente y, por tanto, sea más popular.
+
+### tempo
+
+Dado que *tempo* indica el número de beats por minuto de la canción, se cree que es un buen indicador de `popularity`, ya que una canción con un tempo muy rápido o muy lento puede no gustar a la mayoría de gente.
+
+### acousticness
+
+Dado que *acousticness* indica la calidad acústica de la canción, se cree que es un buen indicador de `popularity`, ya que una canción con buena calidad acústica gustará más que una que esté grabada con peor calidad.
+
+### instrumentalness
+
+Dado que *instrumentalness* indica el predominio de la instrumentación con respecto a lo vocal, creemos que es un buen indicador de `popularity`, ya que una canción en donde haya mucha más instrumentación que voz puede no gustar tanto a la gente como una en la que se escuche más la voz.
+
+### speechiness
+
+Dado que *speechiness* indica el nivel de presencia de palabra hablada en la canción, se cree que es un buen indicador de popularity, ya que a la gente le gusta más escuchar canciones en las que se cante que en las que se hable.
+
+### danceability
+
+Dado que *danceability* indica si la canción es bailable o no, se cree que es un buen indicador de `popularity`, ya que una canción bailable es más probable que se haga popular al poder ser bailada en fiestas.
+
+### duration_ms
+
+Dado que *duration_ms* indica la duración de la canción en milisegundos, se cree que es un buen indicador de `popularity`, ya que una canción muy larga puede no gustar tanto a la gente.
+
+## Predictores categóricos relacionados con `popularity`
+
+### snapshot_date y album_release_date
+
+*snapchot_date* indica la fecha en la que se ha tomado la muestra, y *album_release_date* indica la fecha en la que se ha publicado el album al que pertenece la canción.
+
+La fecha de publicación de un album influye en la popularidad de las canciones que contiene. Esto podría explicarse de una manera más clara con un ejemplo: si un album se publica en 2020, es más probable que las canciones que contiene sean populares en 2020 que en la actualidad (2023), ya que las canciones tienden a escucharse más en el momento en el que se publican o cercano a esta fecha.
+
+Por otro lado, las muestras se pueden haber tomado en cualquier fecha, y no es lo mismo que se haya tomado en 2020 que en 2023. Siguiendo con el ejemplo anterior, no es lo mismo si el album se publicó en 2020 y la muestra se tomó en 2023 que si el album se publicó en 2020 y la muestra se tomó en 2020. Por este motivo, es importante tener en cuenta snapchot_date y album_release_date en conjunto.
+
+En adición a lo anterior, la fecha en la que se toma una fecha por si misma no es un dato importante, ya que, aunque la popularidad de una canción cambia respecto a cuando se ha tomado la muestra, es la popularidad la que ocurre primero y después se toma una muestra en una fecha. La fecha no influye en la popularidad.
+
+Por todo esto, *snapshot_date* y *album_release_date* son buenos predictores de `popularity` en conjunto, pero no en solitario.
+
+### is_explicit
+
+*is_explicit* indica si la canción es explícita o no. Una canción explícita es aquella que contiene lenguaje explícito, es decir, lenguaje que puede resultar ofensivo para algunas personas. Este tipo de canciones tienen restricciones en ciertos paises, y están prohibidas en ciertos espacios públicos o momentos del día. Esto hace que en ciertos países no suelan escuchar canciones explícitas, y por tanto, que no sean populares en estos.
+
+Por otro lado, por la cultura, en ciertos paises están mal vistas las canciones explícitas, y por tanto, no suelen escucharlas.
+
+Además, en ciertas plataformas las canciones explícitas están obligadas a tener silenciadas las partes explícitas, lo que hace que la canción no sea tan atractiva para el público.
+
+Por estos motivos, *is_explicit* es un buen predictor de `popularity`, y en mayor medida si es acompañado de *country* para tener en cuenta los países en los que no gusta por cultura o tienen restricciones para el lenguaje explícito.
+
+### time_signature
+
+Dado que *time_signature* se refiere al compás de la canción y la gran mayoría de la gente está acostumbrada a escuchar canciones en 4/4, es más probable que una canción con este compás sea más popular que una con un compás más raro. Por esta razón, time_signature parece un buen indicador de `popularity`.
+
+### mode
+
+Dado que *mode* indica si la canción está en modo mayor o menor. Creemos que es un buen indicador de popularity, ya que, al estar en modo mayor, la canción tiene un matiz más alegre que en modo menor, por lo que es más probable que guste a la gente.
+
+## Predictores categóricos no relacionados con `popularity`
+
+### country
+
+La variable *country* indica el país en el que se ha tomado la muestra.
+
+Esta variable no influye en la popularidad de la canción, ya que la popularidad de una canción no depende del país en el que se escuche. Por esta razón, *country* no es un buen indicador de `popularity`.
+
+### name
+
+*name* se refiere al nombre de la canción. En muchos casos, el nombre de una canción es lo primero que se ve de esta, incluso antes de escucharla. El nombre suele ser una palabra o frase con la que el artista identifica su canción. Esto hace que un buen nombre ayude a que un posible oyente clique en la canción para escucharla, lo que da más posibilidades de que le guste y la escuche más a menudo. Además, un nombre corto y conciso, o que resulte "gracioso", es más probable que sea recordado.
+
+Como ejemplo, la siguiente canción: 
+
+```{r}
+datos$name[1437]
+```
+El nombre de esta canción está en un lenguaje no ampliamente conocido en el mundo ni legible en muchos casos, por lo que en el caso de gustarte la canción resulta dificil compartirla para que se expanda su popularidad.
+
+Aun así, esto requeriría realizar un estudio de los nombres y considerar si son o no atractivos, lo que queda fuera del dominio de esta práctica. Por esta razón, no se usará.
+
+### album_name
+
+*album_name* se refiere al nombre del album al que pertenece la canción. Si un album es conocido, es más probable que las canciones sean escuchadas, tanto por fans del artista que quieran escuchar el álbum como por gente que no lo es pero conozcan ese album.
+
+Por otro lado, el nombre del album al que pertenece una canción no es un dato que se suela conocer, y los álbumes no suelen hacerse famosos (las canciones que están en ellos sí). Además, para usar la popularidad del álbum es necesario conocerla, lo que requeriría de un análisis que queda fuera del dominio de la práctica. Por esta razón, el nombre del album no se usará para predecir `popularity`.
+
+Además, la práctica está planteada para evaluar canciones de artistas no conocidos, por lo que su álbum no será conocido. A su vez, el atractivo del nombre de un álbum podría hacer que lo escuchases pero no suele ser común ver los nombres de los álbumes, y calcular el atractivo de los nombres queda fuera del dominio de la práctica.
+
+### artists
+
+*artists* es el nombre del artista o de los artistas a los que pertenece la canción. Existen ciertos artistas que son populares y tienen gran número de fans que siguen su trabajo, lo que hace más probable que sus canciones se hagan populares. A su vez, es más probable que una canción sea escuchada si el artista es conocido, aunque la persona que lo escuche no sea fan suyo.
+
+Por ejemplo, el siguiente artista:
+
+```{r}
+datos$artists[389]
+```
+
+Ángel conocía de la existencia de este, por lo que es más probable que escuche una canción suya que Lola que no conocía de su existencia. Si le saliera una canción del grupo a Lola lo más probable es que no la escuchase, al contrario de Ángel, que sí que los conocía.
+
+Aún así, la práctica está planteada para evaluar canciones de cantantes no conocidos, por lo que se descarta el uso de el predictor artists. Además, se podría ver el atractivo de los nombres de los artistas, pero realizar esto queda fuera del dominio de la práctica.
+
+### spotify_id
+
+Los valores de esta variable se refieren al identificador de la canción en Spotify. Dado que este dato no es conocido por la gran mayoría del público, y son carácteres que no aportan valor para el publico que los lee, no tiene relación alguna con `popularity`. 
+
+Un ejemplo de esta ristra de caracteres es la siguiente:
+
+```{r}
+datos$spotify_id[1]
+```
+
+### key
+
+Dado que *key* se refiere a la tonalidad en la que está interpretada la canción, creemos que no es un buen indicador de `popularity`. Esto es debido a que la tonalidad no influye en que una canción sea más o menos popular, solo influye en que la canción sea ligeramente más o menos aguda.
+
+# Apartado B: Estrategias de preparación de los datos (2 puntos)
+
+## Eliminación de *X*
+
+Existe una columna llamada *X*, que se corresponde con el índice de cada entrada. Esta columna es un fallo en la lectura del dataset, por lo que se va a eliminar. 
+
+```{r}
+datos <- datos[, -1]
+```
+
+## Enunciado
+
+Respóndase a las siguientes preguntas en relación a la preparación de datos
+
+* ¿Qué predictores habría que normalizar? ¿Por qué? ¿Cuál sería la estrategia de normalización en cada caso?
+
+* ¿Podría ser interesante transformar algún atributo o grupos de atributos en uno nuevo? ¿Por qué?
+
+* ¿Cómo podría aprovecharse el carácter secuencial de los datos?
+
+## ¿Qué predictores habría que normalizar? ¿Por qué? ¿Cuál sería la estrategia de normalización en cada caso?
+
+Se van a normalizar los predictores numéricos con normalización z, con el uso de scale:
+
+```{r}
+datos[daily_rank] <- scale(datos$daily_rank)
+datos[daily_movement] <- scale(datos$daily_movement)
+datos[weekly_movement] <- scale(datos$weekly_movement)
+datos[duration_ms] <- scale(datos$duration_ms)
+datos[danceability] <- scale(datos$danceability)
+datos[energy] <- scale(datos$energy)
+datos[loudness] <- scale(datos$loudness)
+datos[speechiness] <- scale(datos$speechiness)
+datos[acousticness] <- scale(datos$acousticness)
+datos[instrumentalness] <- scale(datos$instrumentalness)
+datos[liveness] <- scale(datos$liveness)
+datos[valence] <- scale(datos$valence)
+datos[tempo] <- scale(datos$tempo)
+```
+
+## ¿Podría ser interesante transformar algún atributo o grupos de atributos en uno nuevo? ¿Por qué?
+
+### snapchot_date y album_release_date
+
+Se va a transformar *snapshot_date* y *album_release_date* en una nueva variable llamada *days_since_release*, que indica los días que han pasado desde que se publicó el album al que pertenece la canción hasta que se tomó la muestra. Esto es importante por la razón explicada en anteriores apartados.
+
+Para esto, se va a crear la variable *days_since_release* y se va a añadir al dataset, y después se van a eliminar las variables *snapshot_date* y *album_release_date*.
+
+```{r}
+datos$days_since_release <- as.numeric(as.Date(datos$snapshot_date) - as.Date(datos$album_release_date))
+datos <- datos[, c("spotify_id", "name", "artists", "daily_rank", "daily_movement", "weekly_movement", "country", "is_explicit", "duration_ms", "album_name", "danceability", "energy", "key", "loudness", "mode", "speechiness", "acousticness", "instrumentalness", "liveness", "valence", "tempo", "time_signature", "popularity", "days_since_release")]
+```
+
+Aunque existen 22 muestras con NAs en *album_release_date*, el resultado de la resta con estas muestras es NA así que no se debe de realizar nada al no tener comportamiento extraño (como se dijo anteriormente, se tratarán los NAs en apartados posteriores).
+
+### time_signature
+
+Se va a pasar a categórica la variable *time_signature*, ya que se refiere al compás de la canción y no tiene sentido que sea numérica, que le añade un orden falso ya que los distintos valores de la variable no tienen un orden implícito.
+
+```{r}
+datos$time_signature <- as.factor(datos$time_signature)
+```
+
+### key
+
+Se va a pasar a categórica la variable *key*, ya que se refiere a la tonalidad en la que está interpretada la canción y no tiene sentido que sea numérica.
+
+```{r}
+datos$key <- as.factor(datos$key)
+```
+
+## ¿Cómo podría aprovecharse el carácter secuencial de los datos?
+
+Esto se aprovechó en la transformación de *snapshot_date* y *album_release_date* en *days_since_release*, ya que se usó la fecha de publicación del album para calcular los días que han pasado desde que se publicó hasta que se tomó la muestra
+
+A su vez, se va a aprovechar el caracter secuencial creando una nueva variable llamada *daily_movement_popularity*, que indica el cambio de popularity de la canción con respecto al día anterior:
+
+```{r}
+# HACERLO
+```
+
+Por último, se va aprovechar el caracter secuencial creando una variable llamada *weekly_movement_popularity*, que indica el cambio de popularity de la canción con respecto a la semana anterior:
+
+```{r}
+# HACERLO
+```

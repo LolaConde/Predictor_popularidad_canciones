@@ -289,19 +289,19 @@ Respóndase a las siguientes preguntas en relación a la preparación de datos
 Se van a normalizar los predictores numéricos con normalización z, con el uso de scale:
 
 ```{r}
-datos[daily_rank] <- scale(datos$daily_rank)
-datos[daily_movement] <- scale(datos$daily_movement)
-datos[weekly_movement] <- scale(datos$weekly_movement)
-datos[duration_ms] <- scale(datos$duration_ms)
-datos[danceability] <- scale(datos$danceability)
-datos[energy] <- scale(datos$energy)
-datos[loudness] <- scale(datos$loudness)
-datos[speechiness] <- scale(datos$speechiness)
-datos[acousticness] <- scale(datos$acousticness)
-datos[instrumentalness] <- scale(datos$instrumentalness)
-datos[liveness] <- scale(datos$liveness)
-datos[valence] <- scale(datos$valence)
-datos[tempo] <- scale(datos$tempo)
+datos$daily_rank <- scale(datos$daily_rank)
+datos$daily_movement <- scale(datos$daily_movement)
+datos$weekly_movement <- scale(datos$weekly_movement)
+datos$duration_ms <- scale(datos$duration_ms)
+datos$danceability <- scale(datos$danceability)
+datos$energy <- scale(datos$energy)
+datos$loudness <- scale(datos$loudness)
+datos$speechiness <- scale(datos$speechiness)
+datos$acousticness <- scale(datos$acousticness)
+datos$instrumentalness <- scale(datos$instrumentalness)
+datos$liveness <- scale(datos$liveness)
+datos$valence <- scale(datos$valence)
+datos$tempo <- scale(datos$tempo)
 ```
 
 ## ¿Podría ser interesante transformar algún atributo o grupos de atributos en uno nuevo? ¿Por qué?

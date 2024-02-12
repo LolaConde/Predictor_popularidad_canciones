@@ -304,6 +304,8 @@ datos$valence <- scale(datos$valence)
 datos$tempo <- scale(datos$tempo)
 ```
 
+Se han normalizado para que los predictores tengan valores en la misma escala. Esto podría ayudar a la comparación de variables que estén en diferentes escalas. Además, algunos algoritmos de aprendizaje automático convergen de manera más rápida si las variables están normalizadas.
+
 ## ¿Podría ser interesante transformar algún atributo o grupos de atributos en uno nuevo? ¿Por qué?
 
 ### snapchot_date y album_release_date
@@ -318,6 +320,12 @@ datos <- datos[, c("spotify_id", "name", "artists", "daily_rank", "daily_movemen
 ```
 
 Aunque existen 22 muestras con NAs en *album_release_date*, el resultado de la resta con estas muestras es NA así que no se debe de realizar nada al no tener comportamiento extraño (como se dijo anteriormente, se tratarán los NAs en apartados posteriores).
+
+Se va a normalizar el atributo creado con normalización z, ya que se ha decidido normalizar los atributos numéricos:
+
+```{r}
+datos$days_since_release <- scale(datos$days_since_release)
+```
 
 ### time_signature
 
@@ -337,12 +345,12 @@ datos$key <- as.factor(datos$key)
 
 ## ¿Cómo podría aprovecharse el carácter secuencial de los datos?
 
-Esto se aprovechó en la transformación de *snapshot_date* y *album_release_date* en *days_since_release*, ya que se usó la fecha de publicación del album para calcular los días que han pasado desde que se publicó hasta que se tomó la muestra
+Esto se aprovechó en la transformación de *snapshot_date* y *album_release_date* en *days_since_release*, ya que se usó la fecha de publicación del album para calcular los días que han pasado desde que se publicó hasta que se tomó la muestra.
 
 A su vez, se va a aprovechar el caracter secuencial creando una nueva variable llamada *daily_movement_popularity*, que indica el cambio de popularity de la canción con respecto al día anterior:
 
 ```{r}
-# HACERLO
+
 ```
 
 Por último, se va aprovechar el caracter secuencial creando una variable llamada *weekly_movement_popularity*, que indica el cambio de popularity de la canción con respecto a la semana anterior:
@@ -350,3 +358,5 @@ Por último, se va aprovechar el caracter secuencial creando una variable llamad
 ```{r}
 # HACERLO
 ```
+
+

@@ -74,7 +74,7 @@ Justifica el porqué entiendes que cada atributo tiene o no relación con `popul
 En primer lugar, se va a almacenar el dataset en la variable *datos*:
 
 ```{r}
-rutaDeDatos <- "C:/Users/lolac/OneDrive/Documentos/Lola/Carrera/Cuarto/AC/Entrega 2/spoti.csv"
+rutaDeDatos <- "spoti.csv"
 datos <- read.csv(rutaDeDatos, na.strings = "")
 ```
 

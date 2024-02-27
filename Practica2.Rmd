@@ -316,7 +316,7 @@ Para esto, se va a crear la variable *days_since_release* y se va a añadir al d
 
 ```{r}
 datos$days_since_release <- as.numeric(as.Date(datos$snapshot_date) - as.Date(datos$album_release_date))
-datos <- datos[, c("spotify_id", "name", "artists", "daily_rank", "daily_movement", "weekly_movement", "country", "is_explicit", "duration_ms", "album_name", "danceability", "energy", "key", "loudness", "mode", "speechiness", "acousticness", "instrumentalness", "liveness", "valence", "tempo", "time_signature", "popularity", "days_since_release")]
+datos <- datos[, c("spotify_id", "name", "artists", "daily_rank", "daily_movement", "weekly_movement", "country", "is_explicit", "duration_ms", "album_name", "danceability", "energy", "key", "loudness", "mode", "speechiness", "acousticness", "instrumentalness", "liveness", "valence", "tempo", "time_signature", "popularity", "days_since_release", "snapshot_date")]
 ```
 
 Aunque existen 22 muestras con NAs en *album_release_date*, el resultado de la resta con estas muestras es NA así que no se debe de realizar nada al no tener comportamiento extraño (como se dijo anteriormente, se tratarán los NAs en apartados posteriores).

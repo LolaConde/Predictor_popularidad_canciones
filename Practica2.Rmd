@@ -350,7 +350,39 @@ Esto se aprovechó en la transformación de *snapshot_date* y *album_release_dat
 A su vez, se va a aprovechar el caracter secuencial creando una nueva variable llamada *daily_movement_popularity*, que indica el cambio de popularity de la canción con respecto al día anterior:
 
 ```{r}
+library(dplyr)
+library(tidyr) # fill
 
+# Se añade un valor null, para añadir después el valor de daily_movement_popularity_ayuda de la columna anterior dentro del mismo grupo (o el anterior del anterior hasta llegar al primero). No se puede hacer en un solo paso.
+
+# Se añade -1000 (valor imposible) en los valores que deberían ser null para evitar que se añada el daily_movement_popularity_ayuda anterior. Después, se añade el null
+datos <- datos %>%
+  arrange(spotify_id, snapshot_date) %>%
+  group_by(spotify_id) %>%
+  mutate(
+    daily_movement_popularity_ayuda = ifelse(
+      row_number() == 1,
+      -1000, # Si es la primera columna del grupo, se pone -1000 porque no se conoce la popularidad del día anterior
+      ifelse(
+        snapshot_date == lag(snapshot_date),
+        NA, # Si es el mismo día que la columna anterior, se pone NA
+        ifelse(
+          as.numeric(as.Date(snapshot_date) - as.Date(lag(snapshot_date))) == 1,
+          popularity - lag(popularity), # Si la columna anterior es el día anterior, se calcula el valor
+          -1000 # Si la columna anterior no es el día anterior, se pone -1000
+        )
+      )
+    )
+  ) %>%
+  fill(daily_movement_popularity_ayuda) %>% 
+  mutate(
+    daily_movement_popularity = ifelse(
+      daily_movement_popularity_ayuda == -1000,
+      NA,
+      daily_movement_popularity_ayuda
+    )
+  ) %>%
+  select(-daily_movement_popularity_ayuda)
 ```
 
 Por último, se va aprovechar el caracter secuencial creando una variable llamada *weekly_movement_popularity*, que indica el cambio de popularity de la canción con respecto a la semana anterior:

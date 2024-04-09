@@ -386,3 +386,47 @@ datos <- datos %>% select(-country, -name, -album_name, -artists, -spotify_id, -
 Debido a que algunos modelos son capaces de trabajar con NAs, se van a dejar los NAs en el dataset. Eliminar las filas con NAs en alguna columna podría hacer que se perdiera información relevante que se encuentra en las otras columnas (predictores) de esas filas.
 
 Si en apartados posteriores se crea un modelo que no acepte NAs, se tratarán en ese momento y para ese modelo en concreto.
+
+# Apartado C: Algoritmos de aprendizaje
+## Random forest
+### Funcionamiento
+
+Random forest se basa en la creación de un conjunto de árboles de decisión o regresión, dependiendo del problema a resolver. En el caso de predecir *popularity*, al tratarse de una variable numérica, se usarán árboles de regresión.
+
+De este modo, se generan un conjunto de árboles de regresión que se usarán en la predicción tomando la predicción de cada uno de ellos y combinándola para obtener la predicción final.
+
+Durante la fase de entrenamiento, para generar cada árbol, se toma un nuevo conjunto de entrenamiento. Este conjunto se genera mediante bootstrapping, que consiste en tomar, de forma aleatoria, el mismo número de muestras que el conjunto de entrenamiento original, permitiendo que se repitan.
+
+Una vez se tiene el conjunto de entrenamiento, se genera el árbol correspondiente. En cada nodo, se selecciona de forma aleatoria un subconjunto de predictores, y de ellos se elije el mejor para dividir el nodo.
+
+La parte aleatoria de la creación del modelo permite que el modelo no se sobreajuste a los datos de entrenamiento como ocurría al generar un árbol de decisión o regresión, y por lo tanto, permite una mejor generalización.
+
+Por último, añadir que para predecir una vez creado el modelo, en el caso de decisión, se toma la clase que más árboles han predicho, y en el caso de regresión, se promedian las predicciones de los árboles.
+
+### Requisitos
+Random forest (y en específico el paquete 'ranger', que se usará para entrenar al modelo) no tiene requisitos de preprocesamiento de los datos, por lo que no se realiza ninguna acción en este apartado.
+
+### Descripción de hiperparámetros
+
+En primer lugar, se obtiene una tabla con los parámetros que se pueden modificar para crear el modelo:
+
+```{r}
+library(caret)
+modelInfo = getModelInfo("ranger")
+modelInfo = modelInfo$ranger
+modelInfo$parameters
+```
+
+Como se puede observar, se encuentran 3 parámetros de configuración:
+
+1. *mtry*: Por defecto, es la raíz cuadrada del número de predictores.
+
+2. *splitrule*: Por defecto, se utiliza "variance" para regresión.
+
+3. *min.node.size*: Por defecto, es 5 para regresión (como es el caso de *popularity*).
+
+Como se dijo anteriormente, en el entrenamiento de cada árbol, en cada nodo, se selecciona de forma aleatoria un subconjunto de predictores, y de ellos se elije el mejor para dividir el nodo. Este subconjunto es del tamaño que indica este parámetro *mtry*, y la decisión de qué predictor elegir se hace siguiendo el método indicado en *splitrule*. Por último, *min.node.size* indica el número mínimo de muestras que debe tener un nodo para poder dividirse.
+
+Por último, indicar que la varianza para dividir un nodo en regresión (método por defecto en *splitrule*) se usa de modo que se calcula la varianza de las posibles divisiones. La división que tenga una varianza menor, indica que los valores de la variable a predecir están más concentrados (homogéneos) en los nodos resultantes que en los del resto de divisiones posibles, lo que hace que sea la mejor división (y la que se escoje).
+
+### Grid de hiperparámetros

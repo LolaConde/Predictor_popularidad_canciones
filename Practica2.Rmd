@@ -404,7 +404,17 @@ La parte aleatoria de la creación del modelo permite que el modelo no se sobrea
 Por último, añadir que para predecir una vez creado el modelo, en el caso de decisión, se toma la clase que más árboles han predicho, y en el caso de regresión, se promedian las predicciones de los árboles.
 
 ### Requisitos
-Random forest (y en específico el paquete 'ranger', que se usará para entrenar al modelo) no tiene requisitos de preprocesamiento de los datos, por lo que no se realiza ninguna acción en este apartado.
+Random forest (y en específico el paquete 'ranger', que se usará para entrenar al modelo) necesita trabajar con datos sin valores NA, por lo que se va a consultar el número de NAs existentes:
+
+```{r}
+apply(datos, 2, function(y){sum(is.na(y))})
+```
+
+Como se ha podido observar, existen tan solo 7539 NAs en daily_movement_popularity y 22 en days_since_release. Al tener un dataset con 105669 filas, se consideran muy pocas filas con NAs, por lo que la estrategia seguida será eliminar dichas filas.
+
+```{r}
+datos_sin_NAs <- na.omit(datos)
+```
 
 ### Descripción de hiperparámetros
 
@@ -430,3 +440,251 @@ Como se dijo anteriormente, en el entrenamiento de cada árbol, en cada nodo, se
 Por último, indicar que la varianza para dividir un nodo en regresión (método por defecto en *splitrule*) se usa de modo que se calcula la varianza de las posibles divisiones. La división que tenga una varianza menor, indica que los valores de la variable a predecir están más concentrados (homogéneos) en los nodos resultantes que en los del resto de divisiones posibles, lo que hace que sea la mejor división (y la que se escoje).
 
 ### Grid de hiperparámetros
+
+Debido a que *mtry* suele dar buenos resultados con la raíz cuadrada del número de predictores, se va a probar con valores cercanos a ella. Existen un total de 19 predictores, por lo que su raiz cuadrada es 4.36. Por esta razón, se va a probar con 3, 4, 5, 6, y 7 predictores.
+
+Por otro lado, se va a probar con "variance", "extratrees" y "maxstat" en *splitrule*, y se va a probar con los valores 25, 50, 100, 150, y 200 en *min.node.size*.
+
+Por lo tanto, se crea el grid:
+
+```{r}
+mygrid = expand.grid(mtry = c(3,4,5,6,7),
+                     splitrule=c("variance","extratrees", "maxstat"),
+                     min.node.size  =c(25,50,100,150,200))
+```
+
+Una vez creado el grid, se entrenan los modelos. Se va a probar con un conjunto de datos más pequeño, y una vez encontrados los mejores hiperparámetros, se realizará el entrenamiento con el conjunto de datos completo.
+
+Para ello, se crea el conjunto de datos más pequeño con el 10% de las muestras totales, escogidas de forma aleatoria.
+
+```{r}
+set.seed(123)
+elementos_datos_prueba = sample(1:nrow(datos_sin_NAs), nrow(datos_sin_NAs)*0.1)
+
+datos_prueba = datos_sin_NAs[elementos_datos_prueba,]
+
+inTraining <- createDataPartition(datos_prueba$popularity, times=1,p = .75, list = FALSE)
+datos_prueba_train <- datos_prueba[ inTraining,]
+datos_prueba_test  <- datos_prueba[-inTraining,]
+```
+
+Una vez creado el conjunto de datos de prueba, se entrena el modelo con el grid de hiperparámetros creado. Para ello, se deben de incluir el número de árboles del bosque, por lo que se va a probar con 50, 100, 200, 300, y 400 árboles.
+
+```{r}
+fitControl <- trainControl(## 10-fold CV
+   method = "cv",
+   number = 10)
+```
+
+```{r eval=FALSE}
+ranger_50_trees <- train(popularity ~ ., # Popularity es la variable a predecir, el resto son predictores
+   data = datos_prueba_train, # Conjunto de datos de entrenamiento
+   method = "ranger",
+   trControl = fitControl, 
+   tuneGrid=mygrid, 
+   num.trees=50,
+   importance='impurity')
+saveRDS(ranger_50_trees, "ranger_50_trees.rds")
+```
+
+Se guardan los resultados en archivos RDS para no tener que entrenar de nuevo los modelos una vez ya entrenados.
+
+```{r}	
+ranger_50_trees <- readRDS("ranger_50_trees.rds")
+```
+
+```{r}
+ranger_50_trees$bestTune
+```
+
+Los mejores resultados obtenidos son con un *mtry* de 7, un *min.node.size* de 25, y variance como *splitrule*.
+
+```{r eval=FALSE}
+ranger_100_trees <- train(popularity ~ ., # Popularity es la variable a predecir, el resto son predictores
+  data = datos_prueba_train, # Conjunto de datos de entrenamiento
+  method = "ranger",
+  trControl = fitControl, 
+  tuneGrid=mygrid, 
+  num.trees=100,
+  importance='impurity')
+saveRDS(ranger_100_trees, "ranger_100_trees.rds")
+```
+
+```{r}
+ranger_100_trees <- readRDS("ranger_100_trees.rds")
+```
+
+```{r}
+ranger_100_trees$bestTune
+```
+
+Los mejores resultados obtenidos, al igual que con 50 árboles, son con un *mtry* de 7, un *min.node.size* de 25, y variance como *splitrule*.
+
+```{r eval=FALSE}
+ranger_200_trees <- train(popularity ~ ., # Popularity es la variable a predecir, el resto son predictores
+  data = datos_prueba_train, # Conjunto de datos de entrenamiento
+  method = "ranger",
+  trControl = fitControl, 
+  tuneGrid=mygrid, 
+  num.trees=200,
+  importance='impurity')
+saveRDS(ranger_200_trees, "ranger_200_trees.rds")
+```
+
+```{r}
+ranger_200_trees <- readRDS("ranger_200_trees.rds")
+```
+
+```{r}
+ranger_200_trees$bestTune
+```
+
+Como se puede observar, los mejores hiperparámetros son los mismos obtenidos anteriormente.
+
+```{r eval=FALSE}
+ranger_300_trees <- train(popularity ~ ., # Popularity es la variable a predecir, el resto son predictores
+  data = datos_prueba_train, # Conjunto de datos de entrenamiento
+  method = "ranger",
+  trControl = fitControl, 
+  tuneGrid=mygrid, 
+  num.trees=300,
+  importance='impurity')
+saveRDS(ranger_300_trees, "ranger_300_trees.rds")
+```
+
+```{r}
+ranger_300_trees <- readRDS("ranger_300_trees.rds")
+```
+
+```{r}
+ranger_300_trees$bestTune
+```
+
+Como pasaba con el anterior, los mejores hiperparámetros para 300 árboles son los mismos que se obtuvieron en los anteriores modelos.
+
+```{r eval=FALSE}
+ranger_400_trees <- train(popularity ~ ., # Popularity es la variable a predecir, el resto son predictores
+  data = datos_prueba_train, # Conjunto de datos de entrenamiento
+  method = "ranger",
+  trControl = fitControl, 
+  tuneGrid=mygrid, 
+  num.trees=400,
+  importance='impurity')
+saveRDS(ranger_400_trees, "ranger_400_trees.rds")
+```
+
+```{r}
+ranger_400_trees <- readRDS("ranger_400_trees.rds")
+``` 
+
+```{r}
+ranger_400_trees$bestTune
+```
+
+Por último, con 400 árboles, los hiperparámetros que dan los mejores resultados son los mismos que para el resto de número de árboles probados.
+
+Una vez entrenados, se va a observar cómo se comportan los modelos creados con los datos de test (que no se usaron para entrenar el modelo, por lo que nos puede dar una idea de cómo generaliza el modelo). Es importante resaltar que por cada entrenamiento, el modelo creado se ha hecho con los mejores hiperparámetros.
+
+```{r}
+modelos <- list()
+modelos[[1]] <- ranger_50_trees
+modelos[[2]] <- ranger_100_trees
+modelos[[3]] <- ranger_200_trees
+modelos[[4]] <- ranger_300_trees
+modelos[[5]] <- ranger_400_trees
+
+tabla_resultados <- data.frame(RMSE = numeric(),
+                               MAE = numeric(),
+                               Rsquared = numeric(),
+                               numTrees = numeric(),
+                               stringsAsFactors = FALSE)
+
+pred <- predict(ranger_50_trees, datos_prueba_test[, -c(4)])
+metricas <- postResample(as.numeric(datos_prueba_test[4]$popularity), as.numeric(pred))
+tabla_resultados[1, ] <- c(as.numeric(metricas[c("RMSE")]), as.numeric(metricas[c("MAE")]), as.numeric(metricas[c("Rsquared")]), 50)
+
+for (i in 1:4) {
+  pred <- predict(modelos[[i+1]], datos_prueba_test[, -c(4)])
+  metricas <- postResample(as.numeric(datos_prueba_test[4]$popularity), as.numeric(pred))
+  tabla_resultados <- rbind(tabla_resultados, c(as.numeric(metricas[c("RMSE")]), as.numeric(metricas[c("MAE")]), as.numeric(metricas[c("Rsquared")]), i*100))
+}
+
+tabla_resultados
+```
+
+Como se puede observar, el mejor modelo es el creado con 400 árboles, ya que tiene un mayor *Rsquared* y un menor *MAE* y *RMSE* que el resto de modelos.
+
+Una vez mostrados estos resultados, se va a analizar el grid del conjunto con 400 árboles, ya que es el que mejor resultado ha dado. Se muestran los resultados obtenidos:
+
+```{r}
+ranger_400_trees$results
+```
+
+Posteriormente, se muestra la gráfica mostrando como cambia *Rsquared* dependiendo de *min.node.size* para cada *splitrule*:
+
+```{r}
+library(ggplot2)
+library(gridExtra)
+library(grid)
+library(ggplot2)
+library(lattice)
+plots <- list()
+for (mtry_i in 3:7) {
+  filtered_results <- subset(ranger_400_trees$results, mtry == mtry_i)
+  plots[[mtry_i - 2]] <- ggplot(data=datos_mtry_3) +
+     geom_line(mapping= aes(x=min.node.size, y=Rsquared, group=splitrule, color=splitrule), show.legend = TRUE)
+}
+
+grid.arrange(grobs = plots, ncol=2)
+
+
+```
+
+Como se puede observar, se comporta muy parecida en todos los distintos valores de *mtry*. Para todos ellos, *variance* tiene un mayor valor de *Rsquared*, dismunuyendo progresivamente con el aumento de *min.node.size*. Esto se debe a que cuanto más pequeño sean los nodos finales, mejor predice el modelo para los ejemplos con los que se entrenó.
+
+Como se obtiene un mayor valor con *variance*, y con 25 como *min.node.size*, se observa el cambio de RMSE, MAE y RSQUARED para estos, con los distintos valores de *mtry*:
+
+```{r}
+filtered_results <- subset(ranger_400_trees$results, (splitrule == "variance" & min.node.size==25))
+  
+Rsquared <- ggplot(data=filtered_results) +
+     geom_line(mapping= aes(x=mtry, y=Rsquared), show.legend = TRUE)
+
+MAE <- ggplot(data=filtered_results) +
+     geom_line(mapping= aes(x=mtry, y=MAE), show.legend = TRUE)
+
+RMSE <- ggplot(data=filtered_results) +
+     geom_line(mapping= aes(x=mtry, y=RMSE), show.legend = TRUE)
+grid.arrange(Rsquared, MAE, RMSE, ncol=3)
+
+```
+
+Como se puede observar, los errores disminuyen y el RSquared aumenta con el aumento de *mtry*, por lo que el modelo tiene mejores resultados cuando *mtry* es 7. 
+
+Se obtiene el mejor modelo con *mtry* 7, *splitrule* variance y *min.node.size* 25,lo que se corresponde con lo observado en las gráficas anteriores.
+
+Ahora, se va a comentar cómo se comporta el modelo creado con los datos de test.
+
+```{r}
+pred.test = predict(ranger_400_trees, datos_prueba_test[, -c(4)])
+postResample(as.numeric(datos_prueba_test[4]$popularity), as.numeric(pred.test))
+```
+Se observa que el Rsquared es 0.85, lo que indica que lo que el 85% de la variabilidad de *popularity* se puede explicar con el modelo. El RMSE es de 5.9, y el MAE es de 3.6, valores bajos teniendo en cuenta que *popularity* va de 0 a 100. Por lo tanto, se puede concluir que se obtiene un buen modelo.
+
+Por último, se va a comentar cuales son las variables con más importancia en el modelo:
+
+```{r}
+varImp <- varImp(ranger_400_trees)
+importance <- varImp$importance["Overall"]
+
+names<-row.names(importance)[order(importance$Overall,decreasing = T)]
+importance<-importance[order(importance$Overall,decreasing = T),"Overall"]
+df_importance = data.frame(Importance = importance, Variable = names)
+
+ggplot(df_importance, aes(x=Variable, y=importance,group=1))+ geom_line(linetype="dashed") + geom_point()+ scale_x_discrete(limits = c(names))+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+```
+
+Como se puede observar, existen variables cuyo valor influye mucho a la decisión que toma el modelo, como son la duración de la canción, si es bailable, el tempo, o la energía. A la vez, existen variables que no se consideran relevantes para la construcción del modelo, como son la clave o el movimiento diario. 
+
+Aunque parezca que existen muchas variables sin importancia, es importante resaltar que la mayoría de estas es la misma (key). Por lo tanto, el modelo creado considera importantes muchos de los predictores, aunque no todos.

@@ -393,13 +393,13 @@ Si en apartados posteriores se crea un modelo que no acepte NAs, se tratarán en
 
 Random forest se basa en la creación de un conjunto de árboles de decisión o regresión, dependiendo del problema a resolver. En el caso de predecir *popularity*, al tratarse de una variable numérica, se usarán árboles de regresión.
 
-De este modo, se generan un conjunto de árboles de regresión que se usarán en la predicción tomando la predicción de cada uno de ellos y combinándola para obtener la predicción final.
+De este modo, se generan un conjunto de árboles de regresión que se usarán en la predicción final tomando la predicción de cada uno de ellos y combinándola.
 
 Durante la fase de entrenamiento, para generar cada árbol, se toma un nuevo conjunto de entrenamiento. Este conjunto se genera mediante bootstrapping, que consiste en tomar, de forma aleatoria, el mismo número de muestras que el conjunto de entrenamiento original, permitiendo que se repitan.
 
 Una vez se tiene el conjunto de entrenamiento, se genera el árbol correspondiente. En cada nodo, se selecciona de forma aleatoria un subconjunto de predictores, y de ellos se elije el mejor para dividir el nodo.
 
-La parte aleatoria de la creación del modelo permite que el modelo no se sobreajuste a los datos de entrenamiento como ocurría al generar un árbol de decisión o regresión, y por lo tanto, permite una mejor generalización.
+La parte aleatoria de la creación del modelo permite que este no se sobreajuste a los datos de entrenamiento como ocurría al generar un árbol de decisión o regresión, y por lo tanto, permite una mejor generalización.
 
 Por último, añadir que para predecir una vez creado el modelo, en el caso de decisión, se toma la clase que más árboles han predicho, y en el caso de regresión, se promedian las predicciones de los árboles.
 
@@ -435,7 +435,7 @@ Como se puede observar, se encuentran 3 parámetros de configuración:
 
 3. *min.node.size*: Por defecto, es 5 para regresión (como es el caso de *popularity*).
 
-Como se dijo anteriormente, en el entrenamiento de cada árbol, en cada nodo, se selecciona de forma aleatoria un subconjunto de predictores, y de ellos se elije el mejor para dividir el nodo. Este subconjunto es del tamaño que indica este parámetro *mtry*, y la decisión de qué predictor elegir se hace siguiendo el método indicado en *splitrule*. Por último, *min.node.size* indica el número mínimo de muestras que debe tener un nodo para poder dividirse.
+Como se dijo anteriormente, en el entrenamiento de cada árbol, en cada nodo, se selecciona de forma aleatoria un subconjunto de predictores, y de ellos se elije el mejor para dividir el nodo. Este subconjunto es del tamaño que indica el parámetro *mtry*, y la decisión de qué predictor elegir se hace siguiendo el método indicado en *splitrule*. Por último, *min.node.size* indica el número mínimo de muestras que debe tener un nodo para poder dividirse.
 
 Por último, indicar que la varianza para dividir un nodo en regresión (método por defecto en *splitrule*) se usa de modo que se calcula la varianza de las posibles divisiones. La división que tenga una varianza menor, indica que los valores de la variable a predecir están más concentrados (homogéneos) en los nodos resultantes que en los del resto de divisiones posibles, lo que hace que sea la mejor división (y la que se escoje).
 
@@ -669,7 +669,7 @@ Ahora, se va a comentar cómo se comporta el modelo creado con los datos de test
 pred.test = predict(ranger_400_trees, datos_prueba_test[, -c(4)])
 postResample(as.numeric(datos_prueba_test[4]$popularity), as.numeric(pred.test))
 ```
-Se observa que el Rsquared es 0.85, lo que indica que lo que el 85% de la variabilidad de *popularity* se puede explicar con el modelo. El RMSE es de 5.9, y el MAE es de 3.6, valores bajos teniendo en cuenta que *popularity* va de 0 a 100. Por lo tanto, se puede concluir que se obtiene un buen modelo.
+Se observa que el Rsquared es 0.85, lo que indica que lo que el 85% de la variabilidad de *popularity* se puede explicar con el modelo. El RMSE es de 5.9, y el MAE es de 3.6, valores no muy altos teniendo en cuenta que *popularity* va de 0 a 100.
 
 Por último, se va a comentar cuales son las variables con más importancia en el modelo:
 
@@ -687,4 +687,52 @@ ggplot(df_importance, aes(x=Variable, y=importance,group=1))+ geom_line(linetype
 
 Como se puede observar, existen variables cuyo valor influye mucho a la decisión que toma el modelo, como son la duración de la canción, si es bailable, el tempo, o la energía. A la vez, existen variables que no se consideran relevantes para la construcción del modelo, como son la clave o el movimiento diario. 
 
-Aunque parezca que existen muchas variables sin importancia, es importante resaltar que la mayoría de estas es la misma (key). Por lo tanto, el modelo creado considera importantes muchos de los predictores, aunque no todos.
+Aunque parezca que existen muchas variables sin importancia, se debe resaltar que la mayoría de estas es la misma (key). Por lo tanto, el modelo creado considera importantes muchos de los predictores, aunque no todos.
+
+### Resultados 
+
+A modo de resumen, el modelo random forest con mejores resultados para el problema estudiado, es aquel con los hiperparámetros:
+
+- *splitrule* con valor "variance"
+- *min.node.size* con valor 25
+- *mtry* con valor 7
+- *num.trees* con valor 400
+
+Se va a entrenar el modelo con estos hiperparámetros, usando todo el conjunto de datos en su completitud. En primer lugar, se divide el conjunto de datos entre los datos que se usarán en el entrenamiento, y los que se usarán para el test:
+
+```{r}
+inTraining <- createDataPartition(datos_sin_NAs$popularity, times=1,p = .75, list = FALSE)
+datos_train <- datos_sin_NAs[ inTraining,]
+datos_test  <- datos_sin_NAs[-inTraining,]
+```
+
+Una vez obtenido el conjunto de entrenamiento, se entrena el modelo:
+
+```{r eval=FALSE}
+mygrid = expand.grid(mtry = 7,
+                     splitrule= "variance",
+                     min.node.size  = 25)
+
+final_random_forest <- train(popularity ~ .,
+   data = datos_train,
+   method = "ranger",
+   trControl = fitControl, 
+   tuneGrid=mygrid, 
+   num.trees=400,
+   importance='impurity')
+
+saveRDS(final_random_forest, "final_random_forest.rds")
+```
+
+```{r}
+final_random_forest = readRDS("final_random_forest.rds")
+```
+
+Una vez entrenado, se predicen los datos de test, para valorar cómo se comporta el modelo con datos no usados en el entrenamiento, lo que nos da una idea de cómo se comporta el modelo con datos no vistos:
+
+```{r}
+pred.test = predict(final_random_forest, datos_test[, -c(4)])
+postResample(as.numeric(datos_test[4]$popularity), as.numeric(pred.test))
+```
+
+El modelo obtiene un Rsquared de 0.98, lo que indica que es capaz de explicar un 98% de la variablidad de la variable *popularity*. A su vez, los errores obtenidos son 0.64 y 1.9 en MAE y RMSE respectivamente. Estos errores son bajos considerando que la popularidad varía en un rango de 0 a 100, lo que indica que el modelo tiene un buen rendimiento en la predicción de la popularidad.

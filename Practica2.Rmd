@@ -631,7 +631,7 @@ library(lattice)
 plots <- list()
 for (mtry_i in 3:7) {
   filtered_results <- subset(ranger_400_trees$results, mtry == mtry_i)
-  plots[[mtry_i - 2]] <- ggplot(data=datos_mtry_3) +
+  plots[[mtry_i - 2]] <- ggplot(data=filtered_results) +
      geom_line(mapping= aes(x=min.node.size, y=Rsquared, group=splitrule, color=splitrule), show.legend = TRUE)
 }
 
@@ -642,7 +642,7 @@ grid.arrange(grobs = plots, ncol=2)
 
 Como se puede observar, se comporta muy parecida en todos los distintos valores de *mtry*. Para todos ellos, *variance* tiene un mayor valor de *Rsquared*, dismunuyendo progresivamente con el aumento de *min.node.size*. Esto se debe a que cuanto más pequeño sean los nodos finales, mejor predice el modelo para los ejemplos con los que se entrenó.
 
-Como se obtiene un mayor valor con *variance*, y con 25 como *min.node.size*, se observa el cambio de RMSE, MAE y RSQUARED para estos, con los distintos valores de *mtry*:
+Como se obtiene un mayor valor con *variance*, y con 25 como *min.node.size*, se observa el cambio de RMSE, MAE y Rsquared para estos, con los distintos valores de *mtry*:
 
 ```{r}
 filtered_results <- subset(ranger_400_trees$results, (splitrule == "variance" & min.node.size==25))

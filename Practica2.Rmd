@@ -468,7 +468,7 @@ datos_prueba_train <- datos_prueba[ inTraining,]
 datos_prueba_test  <- datos_prueba[-inTraining,]
 ```
 
-Una vez creado el conjunto de datos de prueba, se entrena el modelo con el grid de hiperparámetros creado. Para ello, se deben de incluir el número de árboles del bosque, por lo que se va a probar con 50, 100, 200, 300, y 400 árboles.
+Una vez creado el conjunto de datos de prueba, se entrena el modelo con el grid de hiperparámetros creado. Para ello, se debe incluir el número de árboles del bosque, por lo que se va a probar con 50, 100, 200, 300, y 400 árboles.
 
 ```{r}
 fitControl <- trainControl(## 10-fold CV
@@ -736,3 +736,157 @@ postResample(as.numeric(datos_test[4]$popularity), as.numeric(pred.test))
 ```
 
 El modelo obtiene un Rsquared de 0.98, lo que indica que es capaz de explicar un 98% de la variablidad de la variable *popularity*. A su vez, los errores obtenidos son 0.64 y 1.9 en MAE y RMSE respectivamente. Estos errores son bajos considerando que la popularidad varía en un rango de 0 a 100, lo que indica que el modelo tiene un buen rendimiento en la predicción de la popularidad.
+
+## Tercer modelo
+
+El tercer modelo a crear será el modelo **Support Vector Machines with Radial Basis Function Kernel**, que se denomina 'svmRadial' en la librería 'caret'.
+
+### Funcionamiento
+
+El modelo SVM es un modelo de aprendizaje supervisado que se utiliza tanto para clasificación como para regresión. En el caso de regresión (nuestro problema), busca una función que, dado un dato, devuelva el valor numérico correspondiente.
+
+Para lograrlo, en primer lugar se utilizan los datos de entrenamiento para encontrar la función. Con estos datos:
+
+1. Se transforman los datos a un espacio de dimensiones superiores con un kernel. En el caso de 'svmRadial', se utiliza el kernel RBF.
+
+2. En el espacio de dimensiones superior, se busca el hiperplano que:
+
+  - Contenga el mayor número de puntos dentro de unos márgenes alrededor de este. Es decir, si los puntos están dentro de los márgenes, no se tiene en cuenta la distancia al hiperplano (son correctos).
+
+  - La función que se busca *f(x) = <w, x> + b*, donde *< _ , _ >* es el producto escalar, *w* es un vector y *b* es un escalar. Se busca minimizar *1/2 ||w||^2*, donde ||w|| es la norma de w.
+
+  Para tener en cuenta los puntos que no pueden estar dentro de los márgenes, se introduce el concepto de *slack variables* (*ξ_i*), que mide la distancia de los puntos fuera de los márgenes a los márgenes. De este modo, se busca minimizar *1/2 ||w||^2 + C Σ ξ_i*, donde C es una constante conocida como coste.
+
+  Esta constante *C* sirve para balancear la importancia que se da a minimizar la norma de *w* con respecto a permitir que algunos puntos queden fuera de los márgenes. Si el coste es muy alto, se le dará más importancia a que los puntos estén dentro de los márgenes, y si es muy bajo, se le dará más importancia a minimizar la norma de *w*. El coste es un hiperparámetro del modelo.
+
+3. Una vez se ha encontrado el hiperplano, ya se tiene el modelo. Para predecir, se transforma el dato al espacio de dimensiones superiores, y se aplica la función *f(x)* para obtener el resultado numérico.
+
+### Requisitos
+
+Es necesario que los datos no tengan valores NA, por lo que se necesita tranformar el conjunto de datos en uno sin NAs. Como se ha comentado anteriormente, para nuestro conjunto de datos, se considera apropiado eliminar las filas con NAs, por lo que se trabaja con la variable ya creada *datos_sin_NAs*.
+
+### Descripción de hiperparámetros
+
+En primer lugar, se obtiene una tabla con los parámetros que se pueden modificar para crear el modelo:
+
+```{r}
+library(caret)
+modelInfo = getModelInfo("svmRadial")
+modelInfo = modelInfo$svmRadial
+modelInfo$parameters
+```
+
+Como se puede observar, se encuentran 2 parámetros de configuración:
+
+1. *C*: Representa el coste, por lo que es un parámetro numérico. 
+2, *sigma*: Es un parámetro numérico del kernel (RBF). Es importante, dado que un sigma pequeño puede hace que la función sea más compleja, lo que puede llevar a un sobreajuste. Por otro lado, un sigma grande puede hacer que la función sea más simple, lo que puede llevar a un subajuste.
+
+### Grid de hiperparámetros
+
+Con el fin de probar diversos valores (tanto pequeños como grandes) de cada hiperparámetro, se va a probar con los valores 0.01, 0.1, 1, 10, 100, y 1000 tanto para *C* como para *sigma*.
+
+Se crea el grid:
+
+```{r}
+mygrid = expand.grid(C = c(0.01, 0.1, 1, 10, 100, 1000),
+                     sigma = c(0.01, 0.1, 1, 10, 100, 1000))
+```
+
+Una vez creado el grid, se crean los modelos con los diferentes hiperparámetros. 
+
+Se va a probar con un conjunto de datos más pequeño, y una vez encontrados los mejores hiperparámetros, se realizará el entrenamiento con el conjunto de datos completo. Como ya se creó el conjunto de datos anteriormente (*datos_prueba_train* y *datos_prueba_test*), se va a utilizar el mismo.
+
+```{r eval=FALSE}
+fitControl <- trainControl(## 10-fold CV
+   method = "cv",
+   number = 10)
+
+svm_modelos <- train(popularity ~ ., # Popularity es la variable a predecir, el resto son predictores
+   data = datos_prueba_train, # Conjunto de datos de entrenamiento
+   method = "svmRadial",
+   trControl = fitControl, 
+   tuneGrid=mygrid,
+   importance='impurity')
+
+saveRDS(svm_modelos, "svm_modelos.rds")
+```
+
+Se guardan los resultados en archivos RDS para no tener que entrenar de nuevo los modelos una vez ya entrenados.
+
+```{r}	
+svm_modelos <- readRDS("svm_modelos.rds")
+```
+
+```{r}
+svm_modelos$bestTune
+```
+
+El mejor modelo, como se puede observar, es el que se obtiene con sigma con valor 0.1 y C con valor 10.
+
+Posteriormente, se va a observar cómo cambia RSquared en función de C según cada valor de sigma.
+
+```{r}
+hiperparametros <- list(0.01, 0.1, 1, 10, 100, 1000)
+i = 1
+plots <- list()
+for (sigma_i in hiperparametros) {
+  filtered_results <- subset(svm_modelos$results, sigma == sigma_i)
+  plots[[i]] <- ggplot(data=filtered_results) +
+     geom_line(mapping= aes(x=C, y=Rsquared), show.legend = TRUE) +
+      ggtitle(paste0("sigma = ", as.character(sigma_i)))
+  i = i + 1
+}
+
+grid.arrange(grobs = plots, ncol=2)
+```
+Como se puede observar, el valor máximo de Rsquared para cada sigma es distinto, de modo que para sigma 1 y 0.01, se obtiene como máximo un valor aproximado de 0.7. De 1 a 1000, cuanto más grande es el número, más pequeño es el Rsquared máximo que se alcanza. De este modo, el valor máximo se obtiene en sigma con valor 0.1, y cuanto más alejado se encuentre el valor de sigma de 0.1, peor resultados obtiene.
+
+Por otro lado, se observa que todos los valores comienzan con valores de Rsquared muy bajos para C muy baja, pero en cuento aumenta un poco, el valor permanece prácticamente igual. Sin embargo, se observa un "pico" para sigma 0.1 en C = 10.
+
+Esto corresponde con lo observado en "svm_modelos$bestTune", de modo que los mejores valores son con sigma=0.1 y C=10. Ahora, se va a comentar cómo se comporta el modelo creado con los datos de test.
+
+```{r}
+pred.test = predict(svm_modelos, datos_prueba_test[, -c(4)])
+postResample(as.numeric(datos_prueba_test[4]$popularity), as.numeric(pred.test))
+```
+Como se puede observar se obtiene un Rsquared de 0.81, indicando que el modelo puede explicar el 81% de la variablidad de la variable *popularity*. A su vez, los errores obtenidos son 3.4 y 6.2 en MAE y RMSE respectivamente (teniendo en cuenta que la popularidad va en un rango de 0 a 100).
+
+Las métricas no son malas, y se prevee (como pasó con los árboles), que con el uso del dataset entero el Rsquared subirá, y MAE y RMSE bajará.
+
+### Resultados
+
+A modo de resumen, el modelo svm con mejores resultados para el problema estudiado, es aquel con los hiperparámetros:
+
+- *C* con valor 10
+- *sigma* con valor 0.1
+
+Se va a entrenar el modelo con estos hiperparámetros, usando todo el conjunto de datos en su completitud. Se va a utilizar el conjunto de datos ya dividido entre los datos que se usarán en el entrenamiento (datos_train), y los que se usarán para el test (datos_test).
+
+Se entrena el modelo:
+
+```{r eval=FALSE}
+mygrid = expand.grid(C = 10,
+                     sigma = 0.1)
+
+final_svm <- train(popularity ~ .,
+   data = datos_train,
+   method = "svmRadial",
+   trControl = fitControl, 
+   tuneGrid=mygrid, 
+   importance='impurity')
+
+saveRDS(final_svm, "final_svm.rds")
+```
+
+```{r}
+final_svm = readRDS("final_svm.rds")
+```
+
+Una vez entrenado, se predicen los datos de test, para valorar cómo se comporta el modelo con datos no usados en el entrenamiento, lo que nos da una idea de cómo se comporta el modelo con datos no vistos:
+
+```{r}
+pred.test = predict(final_svm, datos_test[, -c(4)])
+postResample(as.numeric(datos_test[4]$popularity), as.numeric(pred.test))
+```
+
+Como se ha podido observar, el modelo tiene un Rsquared de 0.969, por lo que el modelo puede explicar un 96.9% de la variablidad de *popularity*. A su vez, los errores son de 1.2 y 2.54 en MAE y RMSE respectivamente. Por lo tanto, el modelo da buenos resultados para ejemplos no vistos.

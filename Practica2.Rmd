@@ -939,14 +939,14 @@ mygrid = expand.grid(size = c(19),
 final_modelo_dl <- train(popularity ~ .,
    data = datos_train_dl,
    method = "mlpKerasDecay",
-   trControl = trainControl("cv", number=5), 
+   trControl = trainControl("cv", number=10), 
    tuneGrid=mygrid)
 
 saveRDS(final_modelo_dl, "final_modelo_dl.rds")
 ```
 
 ```{r}
-final_modelo_dl = readRDS("final_modelo_dl.rds")
+final_modelo_dl = readRDS("final_modelo_dl2.rds")
 ```
 
 Una vez entrenado, se predicen los datos de test, para valorar cómo se comporta el modelo con datos no usados en el entrenamiento, lo que nos da una idea de cómo se comporta el modelo con datos no vistos:
@@ -958,7 +958,7 @@ pred.test = predict(final_modelo_dl, datos_test_dl)
 ```
 
 ```{r}
-pred.test <- readRDS("predTest_final.rds")
+pred.test <- readRDS("predTest_final2.rds")
 postResample(as.numeric(datos_test_dl$popularity), as.numeric(pred.test))
 ```
 
@@ -1118,3 +1118,27 @@ postResample(as.numeric(datos_test[4]$popularity), as.numeric(pred.test))
 
 Como se ha podido observar, el modelo tiene un Rsquared de 0.969, por lo que el modelo puede explicar un 96.9% de la variablidad de *popularity*. A su vez, los errores son de 1.2 y 2.54 en MAE y RMSE respectivamente. Por lo tanto, el modelo da buenos resultados para ejemplos no vistos.
 
+
+# Apartado D: Elección del modelo final
+
+Tal y como indica el enunciado, se va a utilizar el método resamples para observar la diferencia entre los modelos de forma que se pueda escoger el mejor:
+
+```{r}
+resamps <- resamples(list(RandomForest=final_random_forest,
+                          SVM=final_svm,
+                          DeepLearning = final_modelo_dl))
+
+theme1 <- trellis.par.get()
+theme1$plot.symbol$col = rgb(.2, .2, .2, .4)
+theme1$plot.symbol$pch = 16
+theme1$plot.line$col = rgb(1, 0, 0, .7)
+theme1$plot.line$lwd <- 2
+trellis.par.set(theme1)
+bwplot(resamps, layout = c(3, 1))
+```
+
+Como se puede observar, la red neuronal (DeepLearning), obtiene un error mucho mayor que los otros dos modelos. A su vez, Rsquared es menor. Como ya se dijo en el apartado correspondiente y se refuerza en el gráfico, la red neuronal no se considera buen modelo.
+
+Entre random forest y SVM, se observa como random forest tiene un Rsquared muy parecido al de SVM (no se ve la diferencia, aunque en los apartados correspondientes obtenían un Rsquared en el test de 0.98 y 0.96 en random forest y SVM respectivamente, siendo levemente mayor el Rsquared del modelo entrenado con random forest).
+
+Sin embargo, tiene un visible menor error (RMSE y MAE). Por lo tanto, el mejor modelo y por lo tanto el modelo final es el entrenado con random forest.

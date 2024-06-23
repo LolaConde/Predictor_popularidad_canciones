@@ -737,6 +737,233 @@ postResample(as.numeric(datos_test[4]$popularity), as.numeric(pred.test))
 
 El modelo obtiene un Rsquared de 0.98, lo que indica que es capaz de explicar un 98% de la variablidad de la variable *popularity*. A su vez, los errores obtenidos son 0.64 y 1.9 en MAE y RMSE respectivamente. Estos errores son bajos considerando que la popularidad varía en un rango de 0 a 100, lo que indica que el modelo tiene un buen rendimiento en la predicción de la popularidad.
 
+## Deep learning
+
+En este apartado, se va a entrenar una red neuronal con los datos. Antes de comenzar a explicar qué es una red neuronal, se va a instalar tensorflow con la versión 2.8 para que esto pueda funcionar:
+
+```{r eval=FALSE}
+tensorflow::install_tensorflow(version="2.8")
+```
+
+Se ha puesto a eval=FALSE, de modo que no se ejecute todas las veces. Si no se tiene instalado tensorflow, se deberá de ejecutar.
+
+### Funcionamiento
+
+Para explicar qué es una red neuronal, en primer lugar, se va a explicar qué es una neurona. Una neurona tiene un conjunto de entradas numéricas. A cada entrada le asocia un peso, de forma que para obtener la salida en cada momento se hace la suma del peso de cada entrada por el valor que venga por cada una. 
+
+Una red neuronal organiza las neuronas en una serie de capas, de forma que todas las neuronas de una capa son entrada a todas las neuronas de la capa siguiente. De esta forma, se tiene una capa de nodos de entrada, un conjunto de capas ocultas, y por último una capa con los nodos de salida (que dan lugar al resultado que da cada vez la red).
+
+Para que la red pueda aprender aspectos complejos (la suma de muchas funciones lineales sigue siendo una función lineal), es necesario que cada una de las neuronas no se vea afectada únicamente por una función lineal para calcular su salida, sino que esta se vea modificada por una función de activación, que modifique esta salida. 
+
+Durante la fase de entrenamiento, un conjunto de datos se utiliza para ajustar los pesos de las conexiones entre las neuronas. Esto se logra mediante el algoritmo de backpropagation, que calcula el error entre la predicción y el valor real, y ajusta los pesos de las conexiones para minimizar este error. Este ajuste de pesos se hace numerosas veces.
+
+De los cuatro algoritmos disponibles en Caret, basados en el paquete Keras (mlpKerasDropout, mlpKerasDecay, mlpKerasDropoutCost y mlpKerasDecayCost), descartaremos mlpKerasDropoutCost y mlpKerasDecayCost, ya que están diseñados para clasificación y no para regresión, como se indica en la documentación de Caret, y nuestro problema es de regresión.
+
+Entre los dos algoritmos restantes, usaremos mlpKerasDecay, ya que se espera que proporcione mejores resultados al distribuir los pesos de manera más uniforme mediante la regularización L2, además de combatir el sobreajuste con dicha regularización.
+
+### Requisitos
+
+Los requisitos para entrenar el modelo son los siguientes:
+
+- Datos sin valores NAs
+
+- Normalización y escalado de datos: Las características con escalas muy diferentes pueden sesgar el modelo y dificultar la convergencia durante el entrenamiento.
+
+- Regularización: Para evitar el sobreajuste, se aplican técnicas de regularización. 
+
+- Tratamiento de variables categóricas: Convertir las variables categóricas en variables numéricas. Los modelos de machine learning requieren datos numéricos para entrenar los modelos, por lo que las única variable categórica que se permite es la variable a predecir (aunque no es el caso en nuestro problema).
+
+En nuestro caso, se usa la regularización L2 ya presente en mlpKerasDecay, por lo que no es necesario hacerla en este apartado. Además, el escalado de datos ya se hizo en un apartado anterior, por lo que tampoco es necesario volverlo a hacer. 
+
+Se va a utilizar la variable ya creada *datos_sin_NAs* que tiene todos los datos sin NAs. Sobre esta variable, se va a realizar el tratamiento de variables categóricas. Para esto se utiliza la función *dummy_cols* de la librería fastDummies, que convierte las variables categóricas (tipo caracter y factor) a numéricas. De este modo, por cada variable se crean tantas variables como valores diferentes haya, y por cada fila, la variable creada que represente el valor que había tendrá 1, y el resto 0.
+
+No se escalan las variables creadas porque estas solo tienen valor 0 o 1.
+
+```{r}
+library(fastDummies)
+datos_dl = data.frame(datos_sin_NAs) # Se hace una copia
+datos_dl = dummy_cols(datos_dl) # Se crean las variables numéricas
+datos_dl <- datos_dl %>% select(-key, -is_explicit, -time_signature) #Se eliminan las categóricas (el método no las elimina)
+
+```
+
+### Descripción de hiperparámetros
+
+En primer lugar, se obtiene una tabla con los parámetros que se pueden modificar para crear el modelo:
+
+```{r}
+modelInfo = getModelInfo("mlpKerasDecay")
+modelInfo = modelInfo$mlpKerasDecay
+modelInfo$parameters
+```
+
+Como se puede observar, se encuentran 7 parámetros de configuración:
+
+1. *size*: Nº de neuronas en la capa oculta.
+
+2. *lambda*: Parámetro de regularización L2. Cuando se ajustan los pesos en backpropagation, si se utiliza la regularización L2, también se tienen en cuenta los pesos en sí, de forma que se intenta minimizar su valor absoluto, y así evitar sobreaprendizaje. El parámetro lambda indica la importancia del tamaño de los pesos al hacer backpropagation, de modo que cuanto mayor sea, más se tienen en cuenta.
+
+3. *batch_size*: Durante el entrenamiento de la red, se dividen los datos en una serie de conjuntos con el mismo número de muestras (*batch_size*), de modo que se hace backpropagation una vez se pasan todos los elementos de un conjunto. 
+
+4. *lr*: Tasa de aprendizaje. Se utiliza en backpropagation cuando se deben modificar los pesos de las neuronas al tener un mal resultado final. Las neuronas modifican los pesos (sumandoles o restandoles un valor) teniendo en cuenta la equivocación obtenida, y esta modificación se multiplica por el learning rate. De este modo: 
+
+  - Si es muy alto se modifican más los pesos al obtener error: Podría no encontrar un lugar con poco error al dar un salto demasiado grande.
+  - Si es muy bajo se modifican en menor medida: Podría quedar atrapado con más facilidad en un punto de mínimo local, donde variando poco los valores se obtienen peor resultado pero con una mayor variación se conseguiría mejor.
+
+5. *rho*: Keras utiliza un optimizador llamado RMSprop para generar el modelo. Este optimizador tiene un parámetro llamado *rho*, que suele dar buenos resultados cuando tiene un valor de 0.9. 
+
+6. *decay*: Durante el entrenamiento de la red neuronal se varía la tasa de aprendizaje del modelo, de forma que a principios del entrenamiento sea mayor, y vaya decayendo conforme pasa el tiempo. Esta reducción se puede controlar con *decay*, de forma que cuanto mayor sea, más rápido decrece la tasa de aprendizaje.
+
+7. *activation*: Qué función de activación se usa en las neuronas de la capa oculta.
+
+### Grid de hiperparámetros
+
+Se va a probar con los siguientes parámetros:
+
+- *size*: Se va a probar con 5, 10 y 19 neuronas en la capa.
+
+- *lambda*: Se va a probar con 0.001, 0.01, 0.1.
+
+- *batch_size*: Se va a probar con 32, 64 y 128.
+
+- *lr*: Se va a probar con 0.001, 0.01 y 0.1.
+
+- *rho*: A *rho* típicamente se le asigna el valor 0.9, por lo que se prueba con este valor.
+
+- *decay*: Se prueban los valores 0.001, 0.01 y 0.02.
+
+- *activation*: Se prueba con las funciones de activación *reLU* y *tanh*.
+
+Con estos valores, se crea el grid:
+
+```{r}
+
+mygridmlp = expand.grid(size =  c(5, 10, 19),
+                     lambda = c(0.01, 0.1, 0.001),
+                     batch_size = c(32, 64, 128),
+                     lr = c(0.1, 0.01, 0.001),
+                     rho = c(0.9),
+                     decay = c(0.01, 0.02, 0.001),
+                     activation = c("tanh", "relu"))
+```
+
+Una vez creado el grid, se entrenan los modelos con los distintos hiperparámetros, de forma que se encuentren los que mejor funcionan para nuestros datos. Se va a probar con un conjunto de datos más pequeño (10%):
+
+```{r}
+set.seed(123)
+elementos_datos_prueba_dl = sample(1:nrow(datos_dl), nrow(datos_dl)*0.1)
+
+datos_prueba_dl = datos_dl[elementos_datos_prueba_dl,]
+
+inTraining_dl <- createDataPartition(datos_prueba_dl$popularity, times=1,p = .75, list = FALSE)
+datos_prueba_train_dl <- datos_prueba_dl[ inTraining_dl,]
+datos_prueba_test_dl  <- datos_prueba_dl[-inTraining_dl,]
+```
+
+Una vez creado el conjunto de datos de prueba, se entrena el modelo con el grid de hiperparámetros creado:
+
+```{r eval=FALSE}
+library(caret)
+modelos_dl <- caret::train(popularity ~ .,
+   data = datos_prueba_train_dl,
+   method = 'mlpKerasDecay',
+   trControl = trainControl("cv", number=5),
+   tuneGrid=mygridmlp
+   )
+
+saveRDS(modelos_dl, "modelos_dl.rds")
+```
+
+```{r}
+modelos_ml <- readRDS("modelos_dl_3.rds")
+```
+
+Los resultados de cada modelo son los siguientes:
+
+```{r}
+modelos_ml$results
+```
+
+A continuación, se muestran los hiperparámetros que mejor resultado han tenido:
+
+```{r}
+modelos_ml$bestTune
+```
+
+Después, se pasan los datos del test al modelo, para hacernos una idea de cómo de bien funciona este modelo:
+
+```{r eval=FALSE}
+datos_prueba_test_dl <- datos_prueba_test_dl %>% select(-popularity)
+pred.test = predict(modelos_ml, datos_prueba_test_dl)
+```
+
+Y se muestran los resultados:
+
+```{r}
+pred.test <- readRDS("predTest_prueba2.rds")
+postResample(as.numeric(datos_prueba_test_dl$popularity), as.numeric(pred.test))
+```
+Como se puede observar, el modelo tiene un Rsquared de 0.511 y un MAE y RMSE de 7.2 y 10.3 respectivamente. No se observan buenos resultados, pero se espera a obtener los resultados al entrenar con todos los datos (dado que al haber más datos, se entrena mejor el modelo).
+
+### Resultados
+
+A modo de resumen, el modelo de redes neuronales con mejores resultados para el problema estudiado, es aquel con los hiperparámetros:
+
+- *size* con valor 19
+- *lambda* con valor 0.001
+- *batch_size* con valor 64
+- *lr* con valor 0.1
+- *rho* con valor 0.9
+- *decay* con valor 0.001
+- *activation* con valor "tanh"
+
+Se va a entrenar el modelo con estos hiperparámetros, usando todo el conjunto de datos en su completitud. En primer lugar, se divide el conjunto de datos entre los datos que se usarán en el entrenamiento, y los que se usarán para el test:
+
+```{r}
+inTraining_dl <- createDataPartition(datos_dl$popularity, times=1,p = .75, list = FALSE)
+datos_train_dl <- datos_dl[ inTraining,]
+datos_test_dl  <- datos_dl[-inTraining,]
+```
+
+Una vez obtenidos los datos que se usaran para el entrenamiento, se entrena el modelo con los datos:
+
+```{r eval=FALSE}
+mygrid = expand.grid(size = c(19),
+                     lambda= c(0.001),
+                     batch_size = c(64),
+                     lr = c(0.1),
+                     rho=c(0.9),
+                     decay=c(0.001),
+                     activation=c("tanh"))
+
+final_modelo_dl <- train(popularity ~ .,
+   data = datos_train_dl,
+   method = "mlpKerasDecay",
+   trControl = trainControl("cv", number=5), 
+   tuneGrid=mygrid)
+
+saveRDS(final_modelo_dl, "final_modelo_dl.rds")
+```
+
+```{r}
+final_modelo_dl = readRDS("final_modelo_dl.rds")
+```
+
+Una vez entrenado, se predicen los datos de test, para valorar cómo se comporta el modelo con datos no usados en el entrenamiento, lo que nos da una idea de cómo se comporta el modelo con datos no vistos:
+
+
+```{r eval=FALSE}
+datos_test_dl <- datos_test_dl %>% select(-popularity)
+pred.test = predict(final_modelo_dl, datos_test_dl)
+```
+
+```{r}
+pred.test <- readRDS("predTest_final.rds")
+postResample(as.numeric(datos_test_dl$popularity), as.numeric(pred.test))
+```
+
+Como se puede observar, se muestra un mejor resultado que en las pruebas con menor número de datos. Sin embargo, las métricas son bastante bajas con respecto a lo obtenido en árboles, por lo que el uso de redes neuronales en este problema no se considera apropiado.
+
 ## Tercer modelo
 
 El tercer modelo a crear será el modelo **Support Vector Machines with Radial Basis Function Kernel**, que se denomina 'svmRadial' en la librería 'caret'.
@@ -890,3 +1117,4 @@ postResample(as.numeric(datos_test[4]$popularity), as.numeric(pred.test))
 ```
 
 Como se ha podido observar, el modelo tiene un Rsquared de 0.969, por lo que el modelo puede explicar un 96.9% de la variablidad de *popularity*. A su vez, los errores son de 1.2 y 2.54 en MAE y RMSE respectivamente. Por lo tanto, el modelo da buenos resultados para ejemplos no vistos.
+

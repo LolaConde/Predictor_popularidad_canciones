@@ -70,11 +70,14 @@ Se seleccionan los predictores que no tienen relación con `popularity` de forma
 En primer lugar, se almacena el dataset en la variable *datos*:
 
 ```{r}
-rutaDeDatos <- "spoti.csv"
-datos <- read.csv(rutaDeDatos, na.strings = "")
+rutaDeDatos <- ""
+rutaRDS <- "rds/"
+datos <- read.csv(paste(rutaDeDatos, "spoti.csv", sep=""), na.strings = "")
 ```
 
-Una vez almacenado el dataset que se encontraba en la ruta *rutaDeDatos* en *datos*, se procede describiendo este conjunto de entrenamiento.
+Una vez almacenado el dataset que se encontraba en la carpeta *rutaDeDatos* en *datos*, se procede describiendo este dataset.
+
+A su vez, se ha declarado la ruta a la carpeta donde se encuentran los ficheros rds, que evitan ejecutar partes largas del código como entrenar modelos.
 
 ## Descripción breve del conjunto de entrenamiento
 
@@ -484,13 +487,13 @@ ranger_50_trees <- train(popularity ~ ., # Popularity es la variable a predecir,
    tuneGrid=mygrid, 
    num.trees=50,
    importance='impurity')
-saveRDS(ranger_50_trees, "ranger_50_trees.rds")
+saveRDS(ranger_50_trees, paste(rutaRDS, "ranger_50_trees.rds", sep=""))
 ```
 
 Se guardan los resultados en archivos RDS para no tener que entrenar de nuevo los modelos una vez ya entrenados.
 
 ```{r}	
-ranger_50_trees <- readRDS("ranger_50_trees.rds")
+ranger_50_trees <- readRDS(paste(rutaRDS, "ranger_50_trees.rds", sep=""))
 ```
 
 ```{r}
@@ -507,11 +510,11 @@ ranger_100_trees <- train(popularity ~ ., # Popularity es la variable a predecir
   tuneGrid=mygrid, 
   num.trees=100,
   importance='impurity')
-saveRDS(ranger_100_trees, "ranger_100_trees.rds")
+saveRDS(ranger_100_trees, paste(rutaRDS, "ranger_100_trees.rds", sep=""))
 ```
 
 ```{r}
-ranger_100_trees <- readRDS("ranger_100_trees.rds")
+ranger_100_trees <- readRDS(paste(rutaRDS, "ranger_100_trees.rds", sep=""))
 ```
 
 ```{r}
@@ -528,11 +531,11 @@ ranger_200_trees <- train(popularity ~ ., # Popularity es la variable a predecir
   tuneGrid=mygrid, 
   num.trees=200,
   importance='impurity')
-saveRDS(ranger_200_trees, "ranger_200_trees.rds")
+saveRDS(ranger_200_trees, paste(rutaRDS, "ranger_200_trees.rds", sep=""))
 ```
 
 ```{r}
-ranger_200_trees <- readRDS("ranger_200_trees.rds")
+ranger_200_trees <- readRDS(paste(rutaRDS, "ranger_200_trees.rds", sep=""))
 ```
 
 ```{r}
@@ -549,11 +552,11 @@ ranger_300_trees <- train(popularity ~ ., # Popularity es la variable a predecir
   tuneGrid=mygrid, 
   num.trees=300,
   importance='impurity')
-saveRDS(ranger_300_trees, "ranger_300_trees.rds")
+saveRDS(ranger_300_trees, paste(rutaRDS, "ranger_300_trees.rds", sep=""))
 ```
 
 ```{r}
-ranger_300_trees <- readRDS("ranger_300_trees.rds")
+ranger_300_trees <- readRDS(paste(rutaRDS, "ranger_300_trees.rds", sep=""))
 ```
 
 ```{r}
@@ -570,11 +573,11 @@ ranger_400_trees <- train(popularity ~ ., # Popularity es la variable a predecir
   tuneGrid=mygrid, 
   num.trees=400,
   importance='impurity')
-saveRDS(ranger_400_trees, "ranger_400_trees.rds")
+saveRDS(ranger_400_trees, paste(rutaRDS, "ranger_400_trees.rds", sep=""))
 ```
 
 ```{r}
-ranger_400_trees <- readRDS("ranger_400_trees.rds")
+ranger_400_trees <- readRDS(paste(rutaRDS, "ranger_400_trees.rds", sep=""))
 ``` 
 
 ```{r}
@@ -721,11 +724,11 @@ final_random_forest <- train(popularity ~ .,
    num.trees=400,
    importance='impurity')
 
-saveRDS(final_random_forest, "final_random_forest.rds")
+saveRDS(final_random_forest, paste(rutaRDS, "final_random_forest.rds", sep=""))
 ```
 
 ```{r}
-final_random_forest = readRDS("final_random_forest.rds")
+final_random_forest = readRDS(paste(rutaRDS, "final_random_forest.rds", sep=""))
 ```
 
 Una vez entrenado, se predicen los datos de test, para valorar cómo se comporta el modelo con datos no usados en el entrenamiento, lo que nos da una idea de cómo se comporta el modelo con datos no vistos:
@@ -820,7 +823,7 @@ Como se puede observar, se encuentran 7 parámetros de configuración:
 
 Se va a probar con los siguientes parámetros:
 
-- *size*: Se va a probar con 5, 10 y 19 neuronas en la capa.
+- *size*: Se suele probar con números cercanos al número de predictores. Dado que se tienen 34 (por transformar las variables categóricas a numéricas), se va a probar con 25, 35 y 45 neuronas en la capa oculta.
 
 - *lambda*: Se va a probar con 0.001, 0.01, 0.1.
 
@@ -838,7 +841,7 @@ Con estos valores, se crea el grid:
 
 ```{r}
 
-mygridmlp = expand.grid(size =  c(5, 10, 19),
+mygridmlp = expand.grid(size =  c(25, 35, 45),
                      lambda = c(0.01, 0.1, 0.001),
                      batch_size = c(32, 64, 128),
                      lr = c(0.1, 0.01, 0.001),
@@ -847,11 +850,11 @@ mygridmlp = expand.grid(size =  c(5, 10, 19),
                      activation = c("tanh", "relu"))
 ```
 
-Una vez creado el grid, se entrenan los modelos con los distintos hiperparámetros, de forma que se encuentren los que mejor funcionan para nuestros datos. Se va a probar con un conjunto de datos más pequeño (10%):
+Una vez creado el grid, se entrenan los modelos con los distintos hiperparámetros, de forma que se encuentren los que mejor funcionan para nuestros datos. Se va a probar con un conjunto de datos más pequeño (25%):
 
 ```{r}
 set.seed(123)
-elementos_datos_prueba_dl = sample(1:nrow(datos_dl), nrow(datos_dl)*0.1)
+elementos_datos_prueba_dl = sample(1:nrow(datos_dl), nrow(datos_dl)*0.25)
 
 datos_prueba_dl = datos_dl[elementos_datos_prueba_dl,]
 
@@ -871,23 +874,23 @@ modelos_dl <- caret::train(popularity ~ .,
    tuneGrid=mygridmlp
    )
 
-saveRDS(modelos_dl, "modelos_dl.rds")
+saveRDS(modelos_dl, paste(rutaRDS, "modelos_dl.rds", sep=""))
 ```
 
 ```{r}
-modelos_ml <- readRDS("modelos_dl_3.rds")
+modelos_dl <- readRDS(paste(rutaRDS, "modelos_dl.rds", sep=""))
 ```
 
 Los resultados de cada modelo son los siguientes:
 
 ```{r}
-modelos_ml$results
+modelos_dl$results
 ```
 
 A continuación, se muestran los hiperparámetros que mejor resultado han tenido:
 
 ```{r}
-modelos_ml$bestTune
+modelos_dl$bestTune
 ```
 
 Después, se pasan los datos del test al modelo, para hacernos una idea de cómo de bien funciona este modelo:
@@ -895,21 +898,22 @@ Después, se pasan los datos del test al modelo, para hacernos una idea de cómo
 ```{r eval=FALSE}
 datos_prueba_test_dl <- datos_prueba_test_dl %>% select(-popularity)
 pred.test = predict(modelos_ml, datos_prueba_test_dl)
+saveRDS(pred.test, paste(rutaRDS, "predTest_prueba_dl.rds", sep=""))
 ```
 
 Y se muestran los resultados:
 
 ```{r}
-pred.test <- readRDS("predTest_prueba2.rds")
+pred.test <- readRDS(paste(rutaRDS, "predTest_prueba_dl.rds", sep=""))
 postResample(as.numeric(datos_prueba_test_dl$popularity), as.numeric(pred.test))
 ```
-Como se puede observar, el modelo tiene un Rsquared de 0.511 y un MAE y RMSE de 7.2 y 10.3 respectivamente. No se observan buenos resultados, pero se espera a obtener los resultados al entrenar con todos los datos (dado que al haber más datos, se entrena mejor el modelo).
+Como se puede observar, el modelo tiene un Rsquared de 0.70 y un MAE y RMSE de 5.2 y 8 respectivamente. Se observan relativamente buenos resultados, pero se espera a obtener el modelo con todos los datos para comprobarlo.
 
 ### Resultados
 
 A modo de resumen, el modelo de redes neuronales con mejores resultados para el problema estudiado, es aquel con los hiperparámetros:
 
-- *size* con valor 19
+- *size* con valor 45
 - *lambda* con valor 0.001
 - *batch_size* con valor 64
 - *lr* con valor 0.1
@@ -928,7 +932,7 @@ datos_test_dl  <- datos_dl[-inTraining,]
 Una vez obtenidos los datos que se usaran para el entrenamiento, se entrena el modelo con los datos:
 
 ```{r eval=FALSE}
-mygrid = expand.grid(size = c(19),
+mygrid = expand.grid(size = c(45),
                      lambda= c(0.001),
                      batch_size = c(64),
                      lr = c(0.1),
@@ -942,11 +946,11 @@ final_modelo_dl <- train(popularity ~ .,
    trControl = trainControl("cv", number=10), 
    tuneGrid=mygrid)
 
-saveRDS(final_modelo_dl, "final_modelo_dl.rds")
+saveRDS(final_modelo_dl, paste(rutaRDS, "final_modelo_dl.rds", sep=""))
 ```
 
 ```{r}
-final_modelo_dl = readRDS("final_modelo_dl2.rds")
+final_modelo_dl = readRDS(paste(rutaRDS, "final_modelo_dl.rds", sep=""))
 ```
 
 Una vez entrenado, se predicen los datos de test, para valorar cómo se comporta el modelo con datos no usados en el entrenamiento, lo que nos da una idea de cómo se comporta el modelo con datos no vistos:
@@ -955,14 +959,18 @@ Una vez entrenado, se predicen los datos de test, para valorar cómo se comporta
 ```{r eval=FALSE}
 datos_test_dl <- datos_test_dl %>% select(-popularity)
 pred.test = predict(final_modelo_dl, datos_test_dl)
+saveRDS(pred.test, paste(rutaRDS, "predTest_dl.rds", sep=""))
 ```
 
 ```{r}
-pred.test <- readRDS("predTest_final2.rds")
+pred.test <- readRDS(paste(rutaRDS, "predTest_dl.rds", sep=""))
 postResample(as.numeric(datos_test_dl$popularity), as.numeric(pred.test))
 ```
+Se observa una mejora en el *Rsquared* en relación con el modelo entrenado con pocos datos, y tanto el MAE como el RMSE han disminuido. Esto es coherente, ya que disponer de más datos para entrenar generalmente conduce a mejores resultados.
 
-Como se puede observar, se muestra un mejor resultado que en las pruebas con menor número de datos. Sin embargo, las métricas son bastante bajas con respecto a lo obtenido en árboles, por lo que el uso de redes neuronales en este problema no se considera apropiado.
+El modelo de red neuronal puede explicar (*rsquared*) un 77.8% de la variabilidad de la variable popularity, obteniendo un MAE y un RMSE de 4.3 y 6.8 respectivamente. Estas métricas se consideran relativamente buenas.
+
+Sin embargo, las métricas del modelo de red neuronal son significativamente peores en comparación con las obtenidas mediante árboles de decisión. Esto se verá en más profundidad en el apartado D.
 
 ## Tercer modelo
 
@@ -1035,13 +1043,13 @@ svm_modelos <- train(popularity ~ ., # Popularity es la variable a predecir, el 
    tuneGrid=mygrid,
    importance='impurity')
 
-saveRDS(svm_modelos, "svm_modelos.rds")
+saveRDS(svm_modelos, paste(rutaRDS, "svm_modelos.rds", sep=""))
 ```
 
 Se guardan los resultados en archivos RDS para no tener que entrenar de nuevo los modelos una vez ya entrenados.
 
 ```{r}	
-svm_modelos <- readRDS("svm_modelos.rds")
+svm_modelos <- readRDS(paste(rutaRDS, "svm_modelos.rds", sep=""))
 ```
 
 ```{r}
@@ -1102,11 +1110,11 @@ final_svm <- train(popularity ~ .,
    tuneGrid=mygrid, 
    importance='impurity')
 
-saveRDS(final_svm, "final_svm.rds")
+saveRDS(final_svm, paste(rutaRDS, "final_svm.rds", sep=""))
 ```
 
 ```{r}
-final_svm = readRDS("final_svm.rds")
+final_svm = readRDS(paste(rutaRDS, "final_svm.rds", sep=""))
 ```
 
 Una vez entrenado, se predicen los datos de test, para valorar cómo se comporta el modelo con datos no usados en el entrenamiento, lo que nos da una idea de cómo se comporta el modelo con datos no vistos:
@@ -1116,7 +1124,7 @@ pred.test = predict(final_svm, datos_test[, -c(4)])
 postResample(as.numeric(datos_test[4]$popularity), as.numeric(pred.test))
 ```
 
-Como se ha podido observar, el modelo tiene un Rsquared de 0.969, por lo que el modelo puede explicar un 96.9% de la variablidad de *popularity*. A su vez, los errores son de 1.2 y 2.54 en MAE y RMSE respectivamente. Por lo tanto, el modelo da buenos resultados para ejemplos no vistos.
+Como se ha podido observar, el modelo tiene un Rsquared de 0.97, por lo que el modelo puede explicar un 97% de la variablidad de *popularity*. A su vez, los errores son de 1.2 y 2.5 en MAE y RMSE respectivamente. Por lo tanto, el modelo da buenos resultados para ejemplos no vistos.
 
 
 # Apartado D: Elección del modelo final
@@ -1137,7 +1145,7 @@ trellis.par.set(theme1)
 bwplot(resamps, layout = c(3, 1))
 ```
 
-Como se puede observar, la red neuronal (DeepLearning), obtiene un error mucho mayor que los otros dos modelos. A su vez, Rsquared es menor. Como ya se dijo en el apartado correspondiente y se refuerza en el gráfico, la red neuronal no se considera buen modelo.
+Como se puede observar, la red neuronal (DeepLearning), obtiene un error mucho mayor en relación a los otros dos modelos. A su vez, Rsquared es menor. Aunque la red neuronal da buenos resultados, no se considera buen modelo en relación con los otros.
 
 Entre random forest y SVM, se observa como random forest tiene un Rsquared muy parecido al de SVM (no se ve la diferencia, aunque en los apartados correspondientes obtenían un Rsquared en el test de 0.98 y 0.96 en random forest y SVM respectivamente, siendo levemente mayor el Rsquared del modelo entrenado con random forest).
 

@@ -1014,7 +1014,8 @@ modelInfo$parameters
 Como se puede observar, se encuentran 2 parámetros de configuración:
 
 1. *C*: Representa el coste, por lo que es un parámetro numérico. 
-2, *sigma*: Es un parámetro numérico del kernel (RBF). Es importante, dado que un sigma pequeño puede hace que la función sea más compleja, lo que puede llevar a un sobreajuste. Por otro lado, un sigma grande puede hacer que la función sea más simple, lo que puede llevar a un subajuste.
+
+2. *sigma*: Es un parámetro numérico del kernel (RBF). Es importante, dado que un sigma pequeño puede hace que la función sea más compleja, lo que puede llevar a un sobreajuste. Por otro lado, un sigma grande puede hacer que la función sea más simple, lo que puede llevar a un subajuste.
 
 ### Grid de hiperparámetros
 
